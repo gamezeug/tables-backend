@@ -78,7 +78,6 @@ jobs:
         
   analyse:
     executor: gradle_executor
-    context: SonarCloud
     steps:
 
     - attach_workspace:
@@ -116,5 +115,6 @@ workflows:
         requires: 
           - compile
     - analyse:
+        context: SonarCloud
         requires: 
           - test
