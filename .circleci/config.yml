@@ -78,6 +78,7 @@ jobs:
         
   analyse:
     executor: gradle_executor
+    context: SonarCloud
     steps:
 
     - attach_workspace:
@@ -95,7 +96,7 @@ jobs:
   
     - run:
         name: Sonarqube
-        command: gradle sonarqube -Dsonar.login=$SONAR_LOGIN
+        command: gradle sonarqube
 
     # Persist the specified paths into the workspace for use in downstream job. 
     - persist_to_workspace:
