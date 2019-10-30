@@ -1,0 +1,119 @@
+# Java Gradle CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-java/ for more details
+#
+version: 2.1
+
+executors:
+  gradle_executor: # declares a reusable executor for build and test
+    docker:
+    - image: circleci/openjdk:8-jdk
+    working_directory: ~/working_dir
+    environment:
+      # Customize the JVM maximum heap limit
+      JVM_OPTS: -Xmx3200m
+      TERM: dumb
+
+jobs:
+  compile:
+    executor: gradle_executor
+    steps:
+    - checkout
+
+    # Download and cache dependencies
+    - restore_cache:
+        keys:
+        - v1-dependencies-{{ checksum "build.gradle" }}
+        # fallback to using the latest cache if no exact match is found
+        - v1-dependencies-
+
+    - run: gradle dependencies
+
+    - save_cache:
+        paths:
+        - ~/.gradle
+        key: v1-dependencies-{{ checksum "build.gradle" }}
+
+    - run: gradle classes
+      
+    # Persist the specified paths into the workspace for use in downstream job. 
+    - persist_to_workspace:
+        # Must be an absolute path, or relative path from working_directory. 
+        # This is a directory on the container which is taken to be the root directory of the workspace.
+        root: .
+        # Must be relative path from root
+        paths:
+        - .
+        
+  test:
+    executor: gradle_executor
+    steps:
+
+    - attach_workspace:
+        # Must be absolute path or relative path from working_directory
+        at: ~/working_dir
+
+    - run: gradle test
+      
+    - store_test_results:
+        path: build/test-results
+        
+    - store_artifacts:
+        path: build/reports/cucumber
+        
+    - store_artifacts:
+        path: build/reports/junit
+
+    - store_artifacts:
+        path: build/reports/tests/test
+
+    # Persist the specified paths into the workspace for use in downstream job. 
+    - persist_to_workspace:
+        # Must be an absolute path, or relative path from working_directory. 
+        # This is a directory on the container which is taken to be the root directory of the workspace.
+        root: .
+        # Must be relative path from root
+        paths:
+        - .
+        
+  analyse:
+    executor: gradle_executor
+    steps:
+
+    - attach_workspace:
+        # Must be absolute path or relative path from working_directory
+        at: ~/working_dir
+      
+    - run: gradle jacocoTestReport
+  
+    - store_artifacts:
+        path: build/reports/jacoco/test
+  
+    - run:
+        name: Upload to Codecov
+        command: bash <(curl -s https://codecov.io/bash)
+  
+    - run:
+        name: Sonarqube
+        command: gradle sonarqube -Dsonar.login=$SONAR_LOGIN
+
+    # Persist the specified paths into the workspace for use in downstream job. 
+    - persist_to_workspace:
+        # Must be an absolute path, or relative path from working_directory. 
+        # This is a directory on the container which is taken to be the root directory of the workspace.
+        root: .
+        # Must be relative path from root
+        paths:
+        - .
+
+workflows:
+  version: 2
+  workflow:
+    jobs:
+    - compile
+    - test:
+        requires: 
+          - compile
+    - analyse:
+        requires: 
+          - test
